@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,7 @@ type RacesRepo interface {
 	Init() error
 
 	// List will return a list of races.
-	List(filter *racing.ListRacesRequestFilter) ([]*racing.Race, error)
+	List(filter *racing.ListRacesRequestFilter, orderBy string) ([]*racing.Race, error)
 }
 
 type racesRepo struct {
@@ -43,7 +44,7 @@ func (r *racesRepo) Init() error {
 	return err
 }
 
-func (r *racesRepo) List(filter *racing.ListRacesRequestFilter) ([]*racing.Race, error) {
+func (r *racesRepo) List(filter *racing.ListRacesRequestFilter, orderBy string) ([]*racing.Race, error) {
 	var (
 		err   error
 		query string
@@ -53,6 +54,11 @@ func (r *racesRepo) List(filter *racing.ListRacesRequestFilter) ([]*racing.Race,
 	query = getRaceQueries()[racesList]
 
 	query, args = r.applyFilter(query, filter)
+
+	query, err = applyOrder(query, orderBy)
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
@@ -90,6 +96,45 @@ func (r *racesRepo) applyFilter(query string, filter *racing.ListRacesRequestFil
 	}
 
 	return query, args
+}
+
+// allowedOrderFields defines valid columns for ORDER BY to prevent SQL injection.
+var allowedOrderFields = map[string]string{
+	"advertised_start_time": "advertised_start_time",
+	"id":                    "id",
+	"meeting_id":            "meeting_id",
+	"name":                  "name",
+	"number":                "number",
+	"visible":               "visible",
+}
+
+// applyOrder adds ORDER BY to the query. Defaults to "advertised_start_time ASC".
+func applyOrder(query string, orderBy string) (string, error) {
+	if orderBy == "" {
+		return query + " ORDER BY advertised_start_time ASC", nil
+	}
+
+	parts := strings.Fields(orderBy)
+	if len(parts) < 1 || len(parts) > 2 {
+		return "", fmt.Errorf("invalid order_by: %q", orderBy)
+	}
+
+	col, ok := allowedOrderFields[parts[0]]
+	if !ok {
+		return "", fmt.Errorf("unknown order field: %q", parts[0])
+	}
+
+	dir := "ASC"
+	if len(parts) == 2 {
+		switch strings.ToUpper(parts[1]) {
+		case "ASC", "DESC":
+			dir = strings.ToUpper(parts[1])
+		default:
+			return "", fmt.Errorf("invalid order direction: %q", parts[1])
+		}
+	}
+
+	return query + " ORDER BY " + col + " " + dir, nil
 }
 
 func (m *racesRepo) scanRaces(

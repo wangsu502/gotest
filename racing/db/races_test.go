@@ -70,7 +70,7 @@ func boolPtr(b bool) *bool {
 func TestList_NoFilter(t *testing.T) {
 	repo := setupTestDB(t)
 
-	races, err := repo.List(nil)
+	races, err := repo.List(nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestList_VisibleOnly(t *testing.T) {
 
 	races, err := repo.List(&racing.ListRacesRequestFilter{
 		VisibleOnly: boolPtr(true),
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestList_VisibleOnlyFalse(t *testing.T) {
 
 	races, err := repo.List(&racing.ListRacesRequestFilter{
 		VisibleOnly: boolPtr(false),
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestList_MeetingIdsFilter(t *testing.T) {
 
 	races, err := repo.List(&racing.ListRacesRequestFilter{
 		MeetingIds: []int64{1},
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestList_VisibleOnlyWithMeetingIds(t *testing.T) {
 	races, err := repo.List(&racing.ListRacesRequestFilter{
 		MeetingIds:  []int64{1},
 		VisibleOnly: boolPtr(true),
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,5 +141,79 @@ func TestList_VisibleOnlyWithMeetingIds(t *testing.T) {
 	}
 	if len(races) > 0 && races[0].Name != "Race A" {
 		t.Errorf("expected Race A, got %s", races[0].Name)
+	}
+}
+
+func TestList_DefaultOrder(t *testing.T) {
+	repo := setupTestDB(t)
+
+	// Empty orderBy defaults to advertised_start_time ASC.
+	races, err := repo.List(nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(races) != 4 {
+		t.Fatalf("expected 4 races, got %d", len(races))
+	}
+	// Test data times: Race A 10:00, Race B 11:00, Race C 12:00, Race D 13:00.
+	expected := []string{"Race A", "Race B", "Race C", "Race D"}
+	for i, name := range expected {
+		if races[i].Name != name {
+			t.Errorf("position %d: expected %s, got %s", i, name, races[i].Name)
+		}
+	}
+}
+
+func TestList_OrderByStartTimeDesc(t *testing.T) {
+	repo := setupTestDB(t)
+
+	races, err := repo.List(nil, "advertised_start_time DESC")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(races) != 4 {
+		t.Fatalf("expected 4 races, got %d", len(races))
+	}
+	expected := []string{"Race D", "Race C", "Race B", "Race A"}
+	for i, name := range expected {
+		if races[i].Name != name {
+			t.Errorf("position %d: expected %s, got %s", i, name, races[i].Name)
+		}
+	}
+}
+
+func TestList_OrderByName(t *testing.T) {
+	repo := setupTestDB(t)
+
+	races, err := repo.List(nil, "name ASC")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(races) != 4 {
+		t.Fatalf("expected 4 races, got %d", len(races))
+	}
+	expected := []string{"Race A", "Race B", "Race C", "Race D"}
+	for i, name := range expected {
+		if races[i].Name != name {
+			t.Errorf("position %d: expected %s, got %s", i, name, races[i].Name)
+		}
+	}
+}
+
+func TestList_InvalidOrderField(t *testing.T) {
+	repo := setupTestDB(t)
+
+	_, err := repo.List(nil, "invalid_field ASC")
+	if err == nil {
+		t.Fatal("expected error for invalid order field, got nil")
+	}
+}
+
+func TestList_InvalidOrderDirection(t *testing.T) {
+	repo := setupTestDB(t)
+
+	_, err := repo.List(nil, "name INVALID")
+	if err == nil {
+		t.Fatal("expected error for invalid order direction, got nil")
 	}
 }
