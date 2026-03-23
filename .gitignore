@@ -3,3 +3,4 @@
 
 # SQLite database (generated at runtime)
 racing/db/racing.db
+sports/db/sports.db
