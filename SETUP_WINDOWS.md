@@ -7,6 +7,11 @@
   - Required by `go-sqlite3` (CGO)
 - protoc (`choco install protoc`)
   - Required for proto code generation (`go generate ./...`)
+- golangci-lint
+  ```bash
+  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+  ```
+  - Run with `golangci-lint run ./...` in each service directory
 
 ## Build & Run
 

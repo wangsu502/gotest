@@ -20,6 +20,9 @@ type RacesRepo interface {
 
 	// List will return a list of races.
 	List(filter *racing.ListRacesRequestFilter, orderBy string) ([]*racing.Race, error)
+
+	// Get returns a single race by ID.
+	Get(id int64) (*racing.Race, error)
 }
 
 type racesRepo struct {
@@ -143,26 +146,48 @@ func (m *racesRepo) scanRaces(
 	var races []*racing.Race
 
 	for rows.Next() {
-		var race racing.Race
-		var advertisedStart time.Time
-
-		if err := rows.Scan(&race.Id, &race.MeetingId, &race.Name, &race.Number, &race.Visible, &advertisedStart); err != nil {
-			if err == sql.ErrNoRows {
-				return nil, nil
-			}
-
-			return nil, err
-		}
-
-		ts, err := ptypes.TimestampProto(advertisedStart)
+		race, err := m.scanRace(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		race.AdvertisedStartTime = ts
-
-		races = append(races, &race)
+		races = append(races, race)
 	}
 
 	return races, nil
+}
+
+// rowScanner is satisfied by both *sql.Row and *sql.Rows.
+type rowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+// scanRace scans a single race row from the given Scanner (Row or Rows).
+func (m *racesRepo) scanRace(scanner rowScanner) (*racing.Race, error) {
+	var race racing.Race
+	var advertisedStart time.Time
+
+	if err := scanner.Scan(&race.Id, &race.MeetingId, &race.Name, &race.Number, &race.Visible, &advertisedStart); err != nil {
+		return nil, err
+	}
+
+	// Convert Go time.Time to protobuf Timestamp.
+	ts, err := ptypes.TimestampProto(advertisedStart)
+	if err != nil {
+		return nil, err
+	}
+
+	race.AdvertisedStartTime = ts
+
+	return &race, nil
+}
+
+func (r *racesRepo) Get(id int64) (*racing.Race, error) {
+	row := r.db.QueryRow(getRaceQueries()[racesGet], id)
+
+	race, err := r.scanRace(row)
+	if err != nil {
+		return nil, err
+	}
+
+	return race, nil
 }
