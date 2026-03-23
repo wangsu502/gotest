@@ -1,0 +1,5 @@
+# Compiled binaries
+*.exe
+
+# SQLite database (generated at runtime)
+racing/db/racing.db
