@@ -217,3 +217,27 @@ func TestList_InvalidOrderDirection(t *testing.T) {
 		t.Fatal("expected error for invalid order direction, got nil")
 	}
 }
+
+func TestGet_Found(t *testing.T) {
+	repo := setupTestDB(t)
+
+	race, err := repo.Get(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if race.Id != 1 {
+		t.Errorf("expected id 1, got %d", race.Id)
+	}
+	if race.Name != "Race A" {
+		t.Errorf("expected Race A, got %s", race.Name)
+	}
+}
+
+func TestGet_NotFound(t *testing.T) {
+	repo := setupTestDB(t)
+
+	_, err := repo.Get(999)
+	if err == nil {
+		t.Fatal("expected error for non-existent race, got nil")
+	}
+}
